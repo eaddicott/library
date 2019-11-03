@@ -1,0 +1,162 @@
+---
+title: "purrr for (R)odeo"
+author: "Ethan Addicott"
+date: "11/5/2019"
+output:
+  beamer_presentation:
+    colortheme: rose
+    theme: Szeged
+    toc: yes
+  slidy_presentation: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(microbenchmark)
+```
+## Motivating purrr
+*Iteration* is one of the most useful tasks a computer can perform for a researcher.
+
+- Repetition
+  - Static
+  - Dynamic
+
+- The programming *Rule of 3*
+  - Never copy and paste more than twice
+
+## Enter purrR
+
+We loop over vectors and dataframes, do some manipulation of the data, and save the results somewhere so often that there is a whole package designed to help us with this common task: purrR
+
+Thankfully this package is a part of the tidyverse, so we don't need to invoke it separately if we're already in the tidyverse library.
+
+## Exercise: Column by Column Summary Statistics
+```{r mtcars, echo=TRUE, paged.print=FALSE}
+#mean(mtcars) 
+#means(mtcars)
+```
+These won't even run. Not a thing.
+
+## Attempt 2
+```{r , echo=TRUE, paged.print=FALSE}
+output <- summary(mtcars)
+means <- output[4,]
+means
+```
+
+Gross
+
+## Attempt 3: Super Common Issue
+```{r, echo=TRUE}
+means <- vector("double", ncol(mtcars))
+for (i in length(mtcars)){
+  means[[i]] <- mean(mtcars[[i]])
+}
+means
+```
+## Attempt 3: Redux
+```{r, echo=TRUE}
+means <- vector("double", ncol(mtcars))
+for (i in seq_along(mtcars)){
+  means[[i]] <- mean(mtcars[[i]])
+}
+means
+```
+Better...
+
+## purrr Solution
+```{r, echo=TRUE}
+#library(tidyverse)
+means <- vector("double", ncol(mtcars))
+means <- map(mtcars,mean)
+means
+```
+## Survey says...
+```{r, echo=TRUE}
+#library(microbenchmark)
+mbm <- microbenchmark(
+  "loop" = {means <- vector("double", ncol(mtcars))
+            for (i in seq_along(mtcars)){
+              means[[i]] <- mean(mtcars[[i]])
+            }
+  },
+  "purrR" = {means <- vector("double", ncol(mtcars))
+             means <- map(mtcars,mean)
+             means <- as.numeric(means)
+})
+mbm
+```
+purrr wins! By over an order of magnitude.
+
+
+## The Details
+- purrr functions run in C (read: fast!)
+- map() writes to a vector
+- There is a family of map functions that can write to a vector rather than a list (faster!)
+  - map_dbl()
+  - map_chr()
+  - map_dfc(), map_dfr()
+  - map_lgl()
+  - map_int()
+  
+## Example: map_dbl()
+```{r}
+microbenchmark("map" = {means <- vector("double", ncol(mtcars))
+                        means <- map(mtcars,mean)
+                        means <- as.numeric(means)},
+        "map_dbl()" = {means <- vector("double", ncol(mtcars))
+                        means <- map_dbl(mtcars,mean)})
+```
+## Nested Dataframes
+```{r}
+head(mtcars)
+nested <- mtcars %>%
+  group_by(cyl) %>%
+  nest()
+nested
+# This is reversible!
+nested %>% unnest()
+```
+## Models with Nests
+```{r}
+model_fn <- function(df){
+  lm(mpg ~ wt,data = df)
+}
+
+ m_df <- nested %>%
+  mutate(model = map(data,model_fn))
+ 
+ m_df
+```
+## View the results
+ 
+```{r}
+ results <- m_df$model %>% map(summary) 
+ results
+ results %>% map_dbl("r.squared")
+ 
+ results %>% map("coefficients")
+ 
+ betas <- function(model){
+   coefficients(model)[[2]]
+ }
+ 
+ results %>% map_dbl(betas)
+ 
+```
+
+## Also map2
+
+```{r}
+mtcars %>% mutate(hp_wt_ratio = map2_dbl(hp,wt, ~ .x / .y)) %>% select(hp_wt_ratio)
+mtcars %>% mutate(hp_wt_ratio = map2_dbl(hp,wt,`/`)) %>% select(hp_wt_ratio)
+
+```
+## Resources
+
+- https://r4ds.had.co.nz/iteration.html
+- purrR Cheatsheet: https://github.com/rstudio/cheatsheets/blob/master/purrr.pdf
+- https://github.com/cwickham/purrr-tutorial
+- https://emoriebeck.github.io/R-tutorials/purrr/
+
+
