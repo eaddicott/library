@@ -2,19 +2,22 @@
 title: "purrr for (R)odeo"
 author: "Ethan Addicott"
 date: "11/5/2019"
-output:
+output: 
+  revealjs::revealjs_presentation:
+    theme: night
+    incremental: true
+    transition: none
+    css: slides.css
   beamer_presentation:
     colortheme: rose
     theme: Szeged
     toc: yes
-  slidy_presentation: default
 ---
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse)
-library(microbenchmark)
-```
-## Motivating purrr
+# Slides and RMarkdown File
+ http://github.com/eaddicott/library 
+
+# Motivating purrr
+<section style="text-align: left;">
 *Iteration* is one of the most useful tasks a computer can perform for a researcher.
 
 - Repetition
@@ -23,40 +26,81 @@ library(microbenchmark)
 
 - The programming *Rule of 3*
   - Never copy and paste more than twice
+</section>
 
-## Enter purrR
+# Enter purrR
+<section style="text-align: left;">
 
-We loop over vectors and dataframes, do some manipulation of the data, and save the results somewhere so often that there is a whole package designed to help us with this common task: purrR
+ We loop over vectors and dataframes, do some manipulation of the data, and save the results somewhere so often that there is a whole package designed to help us with this common task:
 
-Thankfully this package is a part of the tidyverse, so we don't need to invoke it separately if we're already in the tidyverse library.
+> <center> purrR </center>
 
-## Exercise: Column by Column Summary Statistics
+ Thankfully this package is a part of the tidyverse, so we don't need to invoke it separately if we're already in the tidyverse library.
+</section>
+
+# Exercise: Summary Statistics
+<section style="text-align: left;">
+Your Task: Using your favorite R data (I'm using mtcars), generate column-by-column summary statistics
+</section>
+```{r}
+head(mtcars)
+```
+## An Aside
+
+Let's take the mean of a vector of numbers from 1 to 5
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(microbenchmark)
+```
 ```{r mtcars, echo=TRUE, paged.print=FALSE}
-#mean(mtcars) 
+# The mean of a list of numbers
+mean(1:5)
+```
+
+> This checks out! Can we do the same thing to generate the means by column for our data?
+
+## FAIL! 
+```{r}
+#mean(mtcars)
+
 #means(mtcars)
 ```
-These won't even run. Not a thing.
+ These won't even run. Not a thing.
 
-## Attempt 2
+# Attempt 2
 ```{r , echo=TRUE, paged.print=FALSE}
 output <- summary(mtcars)
+output
+```
+## Now save the means
+```{r}
 means <- output[4,]
 means
 ```
 
-Gross
+> Gross! I don't want to have to pull out a vector of doubles from this!
 
-## Attempt 3: Super Common Issue
+# Attempt 3: Super Common Issue
 ```{r, echo=TRUE}
+#Preallocate the vector for means
 means <- vector("double", ncol(mtcars))
+# for loop to take the column by column means
 for (i in length(mtcars)){
   means[[i]] <- mean(mtcars[[i]])
 }
+# see the mean vector
 means
+colnames(mtcars)
 ```
+> What happened???
+
 ## Attempt 3: Redux
 ```{r, echo=TRUE}
+#Preallocate
 means <- vector("double", ncol(mtcars))
+#for loop
 for (i in seq_along(mtcars)){
   means[[i]] <- mean(mtcars[[i]])
 }
@@ -64,14 +108,28 @@ means
 ```
 Better...
 
-## purrr Solution
+> NOTICE seq_along solves the issue much better than length(mtcars[1,])
+
+# purrr Solution
 ```{r, echo=TRUE}
 #library(tidyverse)
 means <- vector("double", ncol(mtcars))
 means <- map(mtcars,mean)
 means
 ```
-## Survey says...
+
+## Getting the values
+```{r}
+means[1]
+means[[1]]
+25-means[[1]]
+```
+
+So we can extract the means and play with them.
+> Still not convinced we should use purrr?
+> It does accomplish things in fewer lines of code, but what else?
+
+# Survey says...
 ```{r, echo=TRUE}
 #library(microbenchmark)
 mbm <- microbenchmark(
@@ -86,10 +144,11 @@ mbm <- microbenchmark(
 })
 mbm
 ```
-purrr wins! By over an order of magnitude.
+> purrr wins! 
+> By over an order of magnitude!!
 
 
-## The Details
+# The Details
 - purrr functions run in C (read: fast!)
 - map() writes to a vector
 - There is a family of map functions that can write to a vector rather than a list (faster!)
@@ -99,7 +158,7 @@ purrr wins! By over an order of magnitude.
   - map_lgl()
   - map_int()
   
-## Example: map_dbl()
+# Example: map_dbl()
 ```{r}
 microbenchmark("map" = {means <- vector("double", ncol(mtcars))
                         means <- map(mtcars,mean)
@@ -107,36 +166,63 @@ microbenchmark("map" = {means <- vector("double", ncol(mtcars))
         "map_dbl()" = {means <- vector("double", ncol(mtcars))
                         means <- map_dbl(mtcars,mean)})
 ```
-## Nested Dataframes
+> Only slightly faster, but those microseconds can add up!
+
+# Nested Dataframes
+A short dive into the tidyverse here to explore some additional benefits in the purrr package.
 ```{r}
 head(mtcars)
+```
+Let's group the data by the number of cylinders and create a nested dataframe.
+
+## Nest by Cylinders
+```{r}
 nested <- mtcars %>%
   group_by(cyl) %>%
   nest()
 nested
-# This is reversible!
+```
+
+## This is reversible!
+```{r}
 nested %>% unnest()
 ```
-## Models with Nests
+
+# Models with Nests
+Now we'll run a model (or set of models) over our nested dataframe.
+
 ```{r}
+#Regressing weight on fuel economy
 model_fn <- function(df){
   lm(mpg ~ wt,data = df)
 }
-
+#apply model over nested data and save to new model column
  m_df <- nested %>%
   mutate(model = map(data,model_fn))
- 
+#take a look
  m_df
 ```
-## View the results
+> Let's view the results!
+
+## Viewing the results
  
 ```{r}
  results <- m_df$model %>% map(summary) 
  results
+```
+
+## Extract R squared
+```{r}
  results %>% map_dbl("r.squared")
- 
+```
+
+## Extract Coefficients
+```{r}
  results %>% map("coefficients")
- 
+```
+
+## Extract Coefficients
+```{r}
  betas <- function(model){
    coefficients(model)[[2]]
  }
@@ -145,14 +231,21 @@ model_fn <- function(df){
  
 ```
 
-## Also map2
+# map2: Another feature in purrr
 
+- Sick of figuring out how to use an apply function over two objects?
+- mapply got you down?
+- FEAR NOT!
+
+## Using map2
 ```{r}
 mtcars %>% mutate(hp_wt_ratio = map2_dbl(hp,wt, ~ .x / .y)) %>% select(hp_wt_ratio)
-mtcars %>% mutate(hp_wt_ratio = map2_dbl(hp,wt,`/`)) %>% select(hp_wt_ratio)
-
 ```
-## Resources
+## Using map2
+```{r}
+mtcars %>% mutate(hp_wt_ratio = map2_dbl(hp,wt,`/`)) %>% select(hp_wt_ratio)
+```
+# Resources
 
 - https://r4ds.had.co.nz/iteration.html
 - purrR Cheatsheet: https://github.com/rstudio/cheatsheets/blob/master/purrr.pdf
