@@ -2013,9 +2013,9 @@ Your Task: Using your favorite R data (I’m using mtcars), generate column-by-c
 <a class="sourceLine" id="cb24-11" title="11">})</a>
 <a class="sourceLine" id="cb24-12" title="12">mbm</a></code></pre></div>
 <pre><code>## Unit: microseconds
-##   expr    min      lq     mean  median      uq    max neval
-##   loop 2333.6 2459.60 2883.901 2686.75 3086.80 5339.6   100
-##  purrR  110.5  130.15  156.796  145.40  160.65  654.4   100</code></pre>
+##   expr    min     lq     mean  median      uq    max neval
+##   loop 2328.7 2403.8 2709.534 2469.05 2928.15 5439.4   100
+##  purrR  112.1  119.8  136.059  130.90  147.15  245.2   100</code></pre>
 <blockquote>
 <p>purrr wins! By over an order of magnitude!!</p>
 </blockquote></section>
@@ -2038,8 +2038,8 @@ Your Task: Using your favorite R data (I’m using mtcars), generate column-by-c
 <a class="sourceLine" id="cb26-5" title="5">                        means &lt;-<span class="st"> </span><span class="kw">map_dbl</span>(mtcars,mean)})</a></code></pre></div>
 <pre><code>## Unit: microseconds
 ##       expr   min    lq    mean median     uq   max neval
-##        map 110.1 131.0 138.336 132.15 137.25 253.3   100
-##  map_dbl() 109.2 129.6 144.545 130.80 134.15 558.5   100</code></pre>
+##        map 109.1 111.8 126.687  115.3 127.05 334.9   100
+##  map_dbl() 109.2 111.9 127.927  114.9 122.90 371.9   100</code></pre>
 <blockquote>
 <p>Only slightly faster, but those microseconds can add up!</p>
 </blockquote></section>
@@ -7046,7 +7046,7 @@ Your Task: Using your favorite R data (I’m using mtcars), generate column-by-c
         // Vertical centering of slides
         center: false,
         // Transition style
-        transition: 'none', // none/fade/slide/convex/concave/zoom
+        transition: 'zoom', // none/fade/slide/convex/concave/zoom
         // Transition style for full page slide backgrounds
         backgroundTransition: 'default', // none/fade/slide/convex/concave/zoom
 
