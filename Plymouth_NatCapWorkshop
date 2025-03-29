@@ -1,0 +1,229 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyOcQ0/CdV7czYeFih4KRQZY",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "ir",
+      "display_name": "R"
+    },
+    "language_info": {
+      "name": "R"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/eaddicott/library/blob/master/Plymouth_NatCapWorkshop\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "MqkSjptSwXTc"
+      },
+      "outputs": [],
+      "source": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Natural Asset Pricing\n",
+        "\n",
+        "E Addicott\n"
+      ],
+      "metadata": {
+        "id": "cDpqlilPzgBX"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "This is a modification of the Fenichel and Abbott (2014) demo included in the\n",
+        "r package.\n",
+        "\n",
+        "Assume we have a stock of resource 's' that we extract according to\n",
+        "$$h(s,x) = qs^{1/2}x^{1/2}$$\n",
+        "\n",
+        "where 'q' is a parameter (like quality of resource) and\n",
+        "'x' scales extraction (think of it as effort or number of harvesters)\n",
+        "\n",
+        "To be as flexible as possible, consider x depending on the stock level:\n",
+        "$$x(s)= ys^\\gamma$$\n",
+        "where 'y' and gamma can be calibrated to match observed effort or harvest.\n",
+        "\n",
+        "The flows of benefits in each period from having resource 's' extracted according\n",
+        "to 'h' is\n",
+        "$$W = mh-cx$$\n",
+        "where 'm' is the market price for extracted resource\n",
+        "'h' is the function that tells us how much is extracted\n",
+        "'c' is the cost of extraction using 'x'\n",
+        "\n",
+        "Assume 's' follows logistic growth parameterized by intrinsic growth rate 'r'\n",
+        "and carrying capacity 'k' with extraction 'h' such that\n",
+        "\n",
+        "$$\\dot{s} = rs(1-\\frac{s}{k})-h(s,x)$$\n",
+        "\n",
+        "Choose discount rate 'delta'"
+      ],
+      "metadata": {
+        "id": "EXhjbomxz_WR"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "if(!require(capn)){\n",
+        "    install.packages(\"capn\")\n",
+        "}\n",
+        "# Load capN and other libraries -----------------------------------------------\n",
+        "library(capn)\n",
+        "\n",
+        "rm(list=ls())\n",
+        "\n",
+        "r <- 0.4 # intrinsic growth rate of stock s\n",
+        "param <- as.data.frame(r)\n",
+        "rm(r)\n",
+        "\n",
+        "param$k <- 360000000 # 350 million: carrying capacity\n",
+        "param$q <- 0.003173   # quality parameter\n",
+        "param$price <- 2.7 # market price of extracted resource\n",
+        "param$cost <- 155 # cost of a unit of effort\n",
+        "param$alpha <- 0.5 # just the power of s and x in the extraction function\n",
+        "param$gamma <- 0.78 # parameter for effort as a function of stock\n",
+        "param$y <- 0.157 # parameter for effort as a function of stock\n",
+        "param$delta <- 0.02 # discount rate (normative assumption)\n",
+        "param$order <- 50 # 50th degree polynomial to approximate using Chebyshev\n",
+        "param$maxS <- param$k  #defining the state space [minS,maxS]\n",
+        "param$minS <- 1000000\n",
+        "param$nodes <- 500   # number of nodes to use in approximating the 50th order Chebyshev polynomial"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "ASKBTtUfzj0l",
+        "outputId": "b2d32a33-f24f-4f0c-eb1f-977370e62fd5"
+      },
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Loading required package: capn\n",
+            "\n",
+            "Warning message in library(package, lib.loc = lib.loc, character.only = TRUE, logical.return = TRUE, :\n",
+            "“there is no package called ‘capn’”\n",
+            "Installing package into ‘/usr/local/lib/R/site-library’\n",
+            "(as ‘lib’ is unspecified)\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Once you've run the above, we'll have the environment set up and the library installed. We'll also have defined a set of parameters."
+      ],
+      "metadata": {
+        "id": "OQPK868j0SUj"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# these are the functions that need to be parameterized/estimated\n",
+        "effort <- function(s, Z){\n",
+        "   Z$y*s^Z$gamma\n",
+        " }\n",
+        "\n",
+        "extraction <- function(s,Z){\n",
+        "   Z$q*effort(s,Z)^Z$alpha*s^Z$alpha\n",
+        " }\n",
+        "\n",
+        "sdot <- function(s,Z){\n",
+        "   Z$r*s*(1-s/Z$k)-extraction(s,Z)\n",
+        " }\n",
+        "\n",
+        "profit <- function(s,Z){\n",
+        "   Z$price*extraction(s,Z)-Z$cost*effort(s,Z)\n",
+        " }\n",
+        "\n",
+        "dwds <- function(s,Z){\n",
+        "   (Z$gamma*Z$alpha+1)*Z$price*Z$q*(Z$y^Z$alpha)*(s^(Z$gamma*Z$alpha))-\n",
+        "   Z$gamma*Z$cost*Z$y*(s^(Z$gamma-1))\n",
+        " }\n",
+        "\n",
+        "dwdss <- function(s,Z){\n",
+        "   (Z$gamma*Z$alpha+1)*Z$gamma*Z$alpha*Z$price*Z$q*(Z$y^Z$alpha)*(s^(Z$gamma*Z$alpha-1))-\n",
+        "   Z$gamma*(Z$gamma-1)*Z$cost*Z$y*(s^(Z$gamma-2))\n",
+        " }\n",
+        "\n",
+        "dsdotds <- function(s,Z){\n",
+        "   Z$r - 2*Z$r*s/Z$k - (Z$gamma*Z$alpha+1)*Z$q*(Z$y^Z$alpha)*(s^(Z$gamma*Z$alpha))\n",
+        " }\n",
+        "\n",
+        "dsdotdss <- function(s,Z){\n",
+        "   -2*Z$r/Z$k-\n",
+        "   (Z$gamma*Z$alpha+1)*Z$gamma*Z$alpha*Z$q*(Z$y^Z$alpha)*(s^((Z$gamma*Z$alpha-1)))\n",
+        " }\n",
+        "\n",
+        "Aspace <- aproxdef(param$order,param$minS,param$maxS,param$delta) #defines the approximation space\n",
+        "\n",
+        "nodes <- chebnodegen(param$nodes,param$minS,param$maxS) #define the nodes\n",
+        "# prepare for simulation\n",
+        "simuDataV <- cbind(nodes,sdot(nodes,param), profit(nodes,param))\n",
+        "\n",
+        "simuDataP <- cbind(nodes,sdot(nodes,param), dsdotds(nodes,param),dwds(nodes,param))\n",
+        "\n",
+        "simuDataPdot <- cbind(nodes,sdot(nodes,param),\n",
+        "                       dsdotds(nodes,param),dsdotdss(nodes,param),\n",
+        "                       dwds(nodes,param),dwdss(nodes,param))\n",
+        "\n",
+        "# recover approximating coefficents for three approaches to address the colocation problem\n",
+        "vC <- vaprox(Aspace,simuDataV)  #the approximated coefficent vector for prices\n",
+        "\n",
+        "pC <- paprox(Aspace,simuDataP[,1],simuDataP[,2],\n",
+        "            simuDataP[,3],simuDataP[,4])  #the approximated coefficent vector for prices\n",
+        "\n",
+        "pdotC <- pdotaprox(Aspace,simuDataPdot[,1],simuDataPdot[,2],  #can approximate pdot instead of p or v as well\n",
+        "                    simuDataPdot[,3],simuDataPdot[,4],\n",
+        "                    simuDataPdot[,5],simuDataPdot[,6])\n",
+        "\n",
+        "# project shadow prices and wealth\n",
+        "SimV <- vsim(vC,as.matrix(simuDataV[,1],ncol=1),profit(nodes,param))\n",
+        "SimP <- psim(pC,simuDataP[,1],profit(nodes,param),simuDataP[,2])\n",
+        "SimPdot <- pdotsim(pdotC,simuDataPdot[,1],simuDataPdot[,2],simuDataPdot[,3],\n",
+        "                       profit(nodes,param),simuDataPdot[,5])\n",
+        "\n",
+        "# Three price curves\n",
+        "plot(nodes,SimV$shadowp, type='l', lwd=2, col=\"blue\",\n",
+        "    ylim = c(0,5), xlim = c(param$minS,param$maxS),\n",
+        "     xlab=\"Stock size, s\",\n",
+        "     ylab=\"Shdow price\")\n",
+        "\n",
+        "lines(nodes, SimP$shadowp, lwd=2, col=\"red\")\n",
+        "\n",
+        "lines(nodes, SimPdot$shadowp, lwd=2, col=\"green\")\n",
+        "```"
+      ],
+      "metadata": {
+        "id": "-0w1DnXa0Xw_"
+      },
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
